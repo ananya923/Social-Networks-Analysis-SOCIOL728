@@ -1,0 +1,255 @@
+---
+title: "coding-challenge-01"
+author: "Ananya Jogalekar aj463"
+format: html
+editor: visual
+---
+
+## SOCIOL728: Week 01 Coding Challenge
+
+R tutorial referenced is available [here](https://inarwhal.github.io/NetworkAnalysisR-book/ch3-Cross-Sectional-Network-Data-R.html).
+
+## 1. Reading the Data
+
+**First, reading the Attributes dataset.**
+
+The data file is stored in the same directory as this R file.
+
+```{r}
+# using stringsAsFactors so that the names will be read as factor variables instead of strings that are difficult to categorize
+attributes_data <- read.csv(file = "camp_attributes.csv", stringsAsFactors = T)
+```
+
+Checking the object created by reading the data:
+
+```{r}
+class(attributes_data)
+```
+
+As the tutorial explains, we need to use matrix objects for network operations. So, converting the dataframe object into a matrix object, and adding a useful set of row names and column names to the matrix:
+
+```{r}
+# convert to matrix
+#attributes_data <- as.matrix(attributes_data)
+
+# add row and col names
+#rownames(attributes_data) <- 1:nrow(attributes_data)
+#colnames(attributes_data) <- c("ID", "gender", "counselor")
+
+# matrix conversion is possible, but I commented it out because packages used later required a dataframe format
+
+attributes_data
+```
+
+**Next, reading the Time dataset.**
+
+```{r}
+time_data <- read.csv(file = "dataset01-camp_time1.csv", stringsAsFactors = T)
+
+# according to the tutorial, we can work with a dataframe for now
+# we don't need to add row and col names, since the data already has them
+
+time_data
+```
+
+**Performing a few checks:**
+
+Testing if the string factoring worked by calling some string indexes and checking if the have levels:
+
+```{r}
+time_data$ID[1:5]
+```
+
+We do see levels, so I believe the factoring worked well.
+
+Next, checking if a random column is numeric or not:
+
+```{r}
+class(time_data[, "JENNIE"])
+```
+
+## 2. Constructing a network object with node attributes in the igraph package
+
+```{r}
+library(igraph)
+```
+
+According to the tutorial, we start by creating a matrix-based network first. For this, we will have to use the `attributes_data` object as that is a matrix.
+
+```{r}
+attributes_netbymatrix <- graph_from_adjacency_matrix(adjmatrix = attributes_data, 
+                                                 mode = "directed")
+```
+
+Given the above error, it seems we can only use this function on the `time_data` since that is a square. Let's convert that into a matrix and use this:
+
+```{r}
+# convert to matrix
+time_data <- as.matrix(time_data)
+
+# remove index column to avoid non-square matrix error
+time_data <- time_data[, -1] # commented out because it was already executed BUT need to execute for future runs!
+
+time_netbymatrix <- graph_from_adjacency_matrix(adjmatrix = time_data, 
+                                                 mode = "directed")
+```
+
+Okay, it works! Now let's check its class:
+
+```{r}
+time_netbymatrix
+```
+
+Great, it is an igraph object. It tells us that the size of the network is 18 and number of edges is 54.
+
+Now, we add the gender attribute from the `attributes_data`.
+
+```{r}
+time_netbymatrix <- set_vertex_attr(graph = time_netbymatrix, 
+                                     name = "gender", 
+                                     value = attributes_data$gender)
+```
+
+In order to avoid a matrix-induced error here, we had to re-read the attributes data and comment out the matrix operations. Now that it is a dataframe, we should have successfully added gender as an attribute by sourcing it from this attributes dataframe and mapping it onto the igraph network object created in the previous step.
+
+Similarly, we can map `counselor` as an attribute from the `attributes_data`.
+
+```{r}
+time_netbymatrix <- set_vertex_attr(graph = time_netbymatrix, 
+                                     name = "counselor", 
+                                     value = attributes_data$counselor)
+```
+
+Re-checking if the network object is intact:
+
+```{r}
+time_netbymatrix
+```
+
+**We see gender and counselor appear as attributes now!**
+
+## 3. Visualizing the network in the basic plot function in igraph
+
+```{r}
+plot(time_netbymatrix)
+```
+
+# 4. Constructing a network object with node attributes in the network package
+
+Getting the packages:
+
+```{r}
+detach(package:igraph)
+library(network)
+```
+
+Constructing `time_data` as a network object:
+
+```{r}
+time_data_matrix <- as.matrix(time_data)
+time_netbymatrix_example2 <- network(x = time_data_matrix, directed = T) 
+```
+
+Converting gender and counselor attributes into characters:
+
+```{r}
+attributes_data$gender <- as.character(attributes_data$gender)
+attributes_data$counselor <- as.character(attributes_data$counselor)
+```
+
+Create a list to use as input to the `network()` function:
+
+```{r}
+attribute_list <- do.call(list, attributes_data)
+attribute_list
+```
+
+Creating the network with the `vertex.attr` argument:
+
+```{r}
+time_netbymatrix_example2 <- network(x = time_data, directed = T, 
+                                      vertex.attr = attribute_list)
+time_netbymatrix_example2
+```
+
+```{r}
+plot(time_netbymatrix_example2)
+```
+
+# 5. Moving between igraph and network objects
+
+r in library(intergraph) : there is no package called ‘intergraph’
+
+```{r}
+library(intergraph)
+```
+
+Specifying the igraph network:
+
+```{r}
+network_from_igraph <- asNetwork(time_netbymatrix)
+network_from_igraph
+```
+
+# 6. Getting some basic network features using igraph
+
+Including each node's indegree/outdegree, the overall density of the network.
+
+## Degree
+
+```{r}
+outdeg <- rowSums(time_data_matrix)
+outdeg
+```
+
+```{r}
+indeg <- colSums(time_data_matrix)
+indeg
+```
+
+Using in-built functions in igraph:
+
+```{r}
+detach(package:network)
+library(igraph)
+```
+
+```{r}
+outdeg_igraph <- degree(graph = time_netbymatrix, mode = "out")
+indeg_igraph <- degree(graph = time_netbymatrix, mode = "in")
+```
+
+```{r}
+# MODIFY THIS CODE TO CHECK IF PREVIOUS MANUAL CALCULATIONS MATCH WITH PACKAGE IN-BUILT CALCS
+outdeg_igraph
+indeg_igraph
+```
+
+## Density
+
+```{r}
+num_edges <- gsize(time_netbymatrix)
+num_edges
+```
+
+```{r}
+num_nodes <- gorder(time_netbymatrix)
+num_nodes
+```
+
+```{r}
+number_dyads <- (num_nodes * (num_nodes - 1))
+```
+
+Using the above calculations to get density:
+
+```{r}
+density_time_network <- num_edges / number_dyads
+density_time_network
+```
+
+Calculation using igraph in-built function:
+
+```{r}
+edge_density(time_netbymatrix)
+```
